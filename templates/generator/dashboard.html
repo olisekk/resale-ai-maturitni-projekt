@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Prodejní přehled — ResaleAI{% endblock %}
+
+{% block content %}
+<header class="page-header page-header--slim">
+  <div class="container d-flex flex-wrap align-items-end justify-content-between gap-3">
+    <div>
+      <p class="section-label mb-2">Osobní přehled</p>
+      <h1 class="page-header__title mb-1">Dobrý den, {{ request.user.username }}</h1>
+      <p class="page-header__sub mb-0">Stav nabídek a přehled očekávaného i realizovaného zisku.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'my_ai_listings' %}" class="btn btn-outline-muted"><i class="bi bi-box-seam me-2"></i>Otevřít inventář</a>
+      <a href="{% url 'generate_listing' %}" class="btn btn-list-item"><i class="bi bi-plus-lg me-2"></i>Přidat položku</a>
+    </div>
+  </div>
+</header>
+
+<main class="container py-4 py-lg-5">
+  <section class="inventory-summary mb-5" aria-label="Souhrn prodeje">
+    <div class="inventory-summary__item"><span>Celkem položek</span><strong>{{ listing_counts.total }}</strong></div>
+    <div class="inventory-summary__item"><span>Připraveno</span><strong>{{ listing_counts.ready }}</strong></div>
+    <div class="inventory-summary__item"><span>Vystaveno</span><strong>{{ listing_counts.listed }}</strong></div>
+    <div class="inventory-summary__item"><span>Prodáno</span><strong>{{ listing_counts.sold }}</strong></div>
+    <div class="inventory-summary__item"><span>Očekávaný čistý zisk</span><strong>{{ projected_profit|floatformat:2 }} €</strong></div>
+    <div class="inventory-summary__item"><span>Realizovaný čistý zisk</span><strong>{{ realized_profit|floatformat:2 }} €</strong></div>
+  </section>
+
+  <section aria-labelledby="recentListingsTitle">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+      <div>
+        <p class="section-label mb-1">Inventář</p>
+        <h2 class="section-title mb-0" id="recentListingsTitle">Nedávné položky</h2>
+      </div>
+      <a href="{% url 'my_ai_listings' %}" class="text-accent">Zobrazit všechny <i class="bi bi-arrow-right ms-1"></i></a>
+    </div>
+
+    {% if recent_listings %}
+    <div class="dashboard-list">
+      {% for listing in recent_listings %}
+      <a class="dashboard-list__row" href="{% url 'ai_listing_detail' listing.pk %}">
+        <span class="dashboard-list__name">{{ listing.product_name }}</span>
+        <span class="inventory-status inventory-status--{{ listing.status }}">{{ listing.get_status_display }}</span>
+        <span class="dashboard-list__profit {% if listing.net_profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ listing.net_profit|floatformat:2 }} €</span>
+        <span class="dashboard-list__date">{{ listing.created_at|date:"j. n. Y" }}</span>
+        <i class="bi bi-arrow-up-right"></i>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="dashboard-empty">
+      <i class="bi bi-box-seam" aria-hidden="true"></i>
+      <h3>Zatím tu nic není</h3>
+      <p>Přidej první položku a připrav si cenu i text nabídky.</p>
+      <a href="{% url 'generate_listing' %}" class="btn btn-list-item">Přidat první položku</a>
+    </div>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Přihlášení — ResaleAI{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-sm-10 col-md-7 col-lg-5">
+
+        <div class="auth-card">
+          <div class="auth-card__header">
+            <div class="auth-logo">
+              <div class="brand-orb">⚡</div>
+            </div>
+            <h2 class="auth-title">Vítej zpět</h2>
+            <p class="auth-sub">Přihlas se do svého prodejního přehledu</p>
+          </div>
+
+          <div class="auth-card__body">
+            {% if form.non_field_errors %}
+            <div class="alert-error mb-4">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              {{ form.non_field_errors.0 }}
+            </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.GET.next }}" />
+
+              <div class="mb-4">
+                <label class="form-label-custom">
+                  <i class="bi bi-person me-1"></i>Uživatelské jméno
+                </label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                <div class="form-error">{{ form.username.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-5">
+                <label class="form-label-custom">
+                  <i class="bi bi-lock me-1"></i>Heslo
+                </label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                <div class="form-error">{{ form.password.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <button type="submit" class="btn btn-auth-submit w-100">
+                Přihlásit se <i class="bi bi-arrow-right ms-2"></i>
+              </button>
+            </form>
+          </div>
+
+          <div class="auth-card__footer">
+            Ještě nemáš účet?
+            <a href="/register/" class="auth-switch-link">Vytvořit účet</a>
+          </div>
+        </div>
+
+        <div class="text-center mt-4">
+          <a href="/" class="back-home-link">
+            <i class="bi bi-arrow-left me-1"></i>Zpět na ResaleAI
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

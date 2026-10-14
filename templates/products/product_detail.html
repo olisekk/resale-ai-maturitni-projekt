@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — ResaleAI{% endblock %}
+
+{% block content %}
+
+<div class="page-header page-header--slim">
+  <div class="container">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb breadcrumb-dark mb-0">
+        <li class="breadcrumb-item"><a href="/">Domů</a></li>
+        <li class="breadcrumb-item"><a href="/products/">Katalog</a></li>
+        <li class="breadcrumb-item active">{{ product.name|truncatechars:40 }}</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="container py-5">
+  <div class="row g-5">
+
+    <!-- ── Image ── -->
+    <div class="col-lg-5">
+      <div class="detail-img-wrap">
+        {% if product.image %}
+        <img src="{{ product.image }}" alt="{{ product.name }}" class="detail-img" />
+        {% else %}
+        <div class="detail-img-placeholder">
+          <i class="bi bi-image fs-1"></i>
+          <p class="mt-2 text-muted small">No image provided</p>
+        </div>
+        {% endif %}
+        <div class="detail-badges">
+          <span class="badge-category-lg">{{ product.get_category_display }}</span>
+          <span class="badge-demand-lg demand-{{ product.demand_score|lower }}">
+            <i class="bi bi-lightning-charge-fill me-1"></i>Poptávka: {{ product.get_demand_score_display }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Info ── -->
+    <div class="col-lg-7">
+      <h1 class="detail-title">{{ product.name }}</h1>
+      {% if review_count > 0 %}
+      <div class="d-flex align-items-center gap-2 mt-2 mb-3">
+        <div class="stars-row">
+          {% for s in avg_stars %}<i class="bi bi-star-fill text-warning"></i>{% endfor %}
+          {% for s in empty_stars %}<i class="bi bi-star text-muted"></i>{% endfor %}
+        </div>
+        <span class="text-muted small">{{ avg_rating }} · {{ review_count }} review{{ review_count|pluralize }}</span>
+      </div>
+      {% endif %}
+
+      <div class="detail-price-block">
+        <span class="detail-price">{{ product.price }} €</span>
+        {% if product.estimated_price %}
+        <span class="detail-est-price">
+          <i class="bi bi-calculator me-1"></i>Orientační odhad {{ product.estimated_price }} €
+        </span>
+        {% endif %}
+      </div>
+
+      <div class="detail-section">
+        <h6 class="detail-section-label">Popis</h6>
+        <p class="detail-description">{{ product.description }}</p>
+      </div>
+
+      <div class="detail-meta-row">
+        <div class="meta-chip"><i class="bi bi-tag-fill me-1 text-accent"></i>{{ product.get_category_display }}</div>
+        <div class="meta-chip"><i class="bi bi-calendar3 me-1 text-accent"></i>{{ product.created_at|date:"j. n. Y" }}</div>
+        <div class="meta-chip"><i class="bi bi-chat-dots me-1 text-accent"></i>{{ review_count }} hodnocení</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════ AI PANEL ═══════════════════════════════ -->
+  <div class="ai-panel mt-5">
+    <div class="ai-panel__glow"></div>
+    <div class="row align-items-start position-relative g-4">
+
+      <!-- Left: AI listing copy + platform buttons -->
+      <div class="col-lg-7">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <div class="ai-icon-wrap"><i class="bi bi-cpu-fill"></i></div>
+          <div>
+            <h5 class="ai-panel__title mb-0">AI Resale Analysis</h5>
+            <small class="text-muted">Text připravený k úpravě</small>
+          </div>
+        </div>
+
+        <!-- Tabbed listing copy -->
+        <ul class="nav nav-tabs listing-tabs mb-3" id="listingTabs">
+          <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabGeneral">
+              <i class="bi bi-cpu me-1"></i>Obecný text
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabVinted">
+              <i class="bi bi-bag-heart me-1"></i>Vinted
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabEbay">
+              <i class="bi bi-shop me-1"></i>eBay
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- General AI listing -->
+          <div class="tab-pane fade show active" id="tabGeneral">
+            <div class="listing-copy-box" id="textGeneral">{{ product.ai_listing }}</div>
+            <button class="btn btn-copy mt-2" onclick="copyListing('textGeneral', this)">
+              <i class="bi bi-clipboard me-1"></i>Kopírovat
+            </button>
+          </div>
+          <!-- Vinted listing -->
+          <div class="tab-pane fade" id="tabVinted">
+            <div class="listing-copy-box" id="textVinted" style="white-space:pre-line;">{{ product.vinted_listing }}</div>
+            <button class="btn btn-copy mt-2" onclick="copyListing('textVinted', this)">
+              <i class="bi bi-clipboard me-1"></i>Kopírovat pro Vinted
+            </button>
+            <a href="https://www.vinted.com/sell" target="_blank" rel="noopener" class="btn btn-platform-link mt-2 ms-2">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Otevřít Vinted
+            </a>
+          </div>
+          <!-- eBay listing -->
+          <div class="tab-pane fade" id="tabEbay">
+            <div class="listing-copy-box" id="textEbay" style="white-space:pre-line;">{{ product.ebay_listing }}</div>
+            <button class="btn btn-copy mt-2" onclick="copyListing('textEbay', this)">
+              <i class="bi bi-clipboard me-1"></i>Kopírovat pro eBay
+            </button>
+            <a href="https://www.ebay.com/sell" target="_blank" rel="noopener" class="btn btn-platform-link mt-2 ms-2">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Otevřít eBay
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Metrics + eBay live check -->
+      <div class="col-lg-5">
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <div class="ai-metric">
+              <span class="ai-metric__label">Orientační odhad</span>
+              <span class="ai-metric__value">{{ product.estimated_price|default:product.price }}€</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="ai-metric">
+              <span class="ai-metric__label">Poptávka</span>
+              <span class="ai-metric__value demand-{{ product.demand_score|lower }}">{{ product.get_demand_score_display }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- eBay Live Price Box -->
+        <div class="ebay-price-box" id="ebayBox">
+          <div class="ebay-price-box__header">
+            <i class="bi bi-graph-up-arrow me-2 text-accent"></i>
+            <span>Aktivní nabídkové ceny na eBay</span>
+            {% if product.ebay_fetched_at %}
+            <span class="ms-auto ebay-fetched-time">{{ product.ebay_fetched_at|date:"M j, H:i" }}</span>
+            {% endif %}
+          </div>
+
+          {% if product.ebay_avg_price %}
+          <!-- Already fetched — show data -->
+          <div class="ebay-price-data" id="ebayData">
+            <div class="row g-2 mt-1">
+              <div class="col-4">
+                <div class="ebay-stat">
+                  <span class="ebay-stat__label">Lowest</span>
+                  <span class="ebay-stat__value text-success">
+                    {% if product.ebay_lowest_price %}{{ product.ebay_currency }} {{ product.ebay_lowest_price }}{% else %}—{% endif %}
+                  </span>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="ebay-stat ebay-stat--main">
+                  <span class="ebay-stat__label">Avg</span>
+                  <span class="ebay-stat__value">{{ product.ebay_currency }} {{ product.ebay_avg_price }}</span>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="ebay-stat">
+                  <span class="ebay-stat__label">Highest</span>
+                  <span class="ebay-stat__value text-danger">
+                    {% if product.ebay_highest_price %}{{ product.ebay_currency }} {{ product.ebay_highest_price }}{% else %}—{% endif %}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p class="market-data-note mt-2 mb-0" id="ebaySampleNote">
+              Vzorek {{ product.ebay_result_count }} aktivních nabídek{% if product.ebay_fetched_at %} · aktualizováno {{ product.ebay_fetched_at|date:"j. n. Y H:i" }}{% endif %}.
+              Nejde o potvrzené prodejní ceny.
+            </p>
+            {% with cmp=product.ebay_price_vs_asking %}
+            {% if cmp %}
+            <div class="ebay-verdict mt-2 {% if cmp.above %}ebay-verdict--good{% else %}ebay-verdict--warn{% endif %}">
+              <i class="bi bi-{% if cmp.above %}arrow-up{% else %}arrow-down{% endif %}-circle-fill me-1"></i>
+              {% if cmp.above %}
+                Průměrná nabídková cena je o <strong>€{{ cmp.diff }}</strong> vyšší než cena produktu.
+              {% else %}
+                Průměrná nabídková cena je o <strong>€{{ cmp.diff|slice:"1:" }}</strong> nižší než cena produktu.
+              {% endif %}
+            </div>
+            {% endif %}
+            {% endwith %}
+          </div>
+          {% else %}
+          <!-- Not yet fetched -->
+          <div class="ebay-price-empty" id="ebayEmpty">
+            <i class="bi bi-search text-muted me-2"></i>
+            <span class="text-muted small">No eBay data yet.</span>
+          </div>
+          {% endif %}
+
+          {% if request.user.is_authenticated and not request.user.is_staff %}
+          <form method="post" action="{% url 'create_product_request' product.pk %}" class="mt-3">
+            {% csrf_token %}
+            <input type="text" name="message" class="form-control form-control-sm mb-2" placeholder="Zpráva pro správce (nepovinné)" />
+            <button type="submit" class="btn btn-list-item w-100">
+              <i class="bi bi-hand-thumbs-up me-2"></i>Mám zájem
+            </button>
+          </form>
+          {% elif request.user.is_staff %}
+          <a href="/dashboard/requests/" class="btn btn-admin-link mt-3 w-100">
+            <i class="bi bi-chat-left-dots me-2"></i>Otevřít žádosti
+          </a>
+          {% else %}
+          <a href="/login/?next=/products/{{ product.pk }}/" class="btn btn-list-item mt-3 w-100">
+            <i class="bi bi-person-circle me-2"></i>Přihlas se a požádej o produkt
+          </a>
+          {% endif %}
+
+          {% if request.user.is_staff %}
+          <form id="ebayCheckForm" method="post" action="{% url 'check_ebay_price' product.pk %}">
+            {% csrf_token %}
+            <button type="button" class="btn btn-ebay-check mt-3 w-100" id="ebayCheckBtn"
+                    onclick="fetchEbayPrice({{ product.pk }})">
+              <i class="bi bi-search me-2"></i>
+              {% if product.ebay_avg_price %}Refresh eBay Price{% else %}Check eBay Price{% endif %}
+            </button>
+          </form>
+          {% else %}
+          <div class="text-muted small mt-3">
+            <i class="bi bi-lock me-1"></i>Obnovení cen je dostupné správci.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════ REVIEWS ════════════════════════════════ -->
+  <div class="reviews-section mt-5">
+    <div class="row g-5">
+      <div class="col-lg-4">
+        <div class="review-summary-card">
+          <div class="review-summary__score">{{ avg_rating }}</div>
+          <div class="review-summary__stars mb-2">
+            {% for s in avg_stars %}<i class="bi bi-star-fill text-warning fs-5"></i>{% endfor %}
+            {% for s in empty_stars %}<i class="bi bi-star text-muted fs-5"></i>{% endfor %}
+          </div>
+          <p class="text-muted small">Based on {{ review_count }} review{{ review_count|pluralize }}</p>
+          <div class="mt-4">
+            {% for star, data in distribution.items %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="dist-label">{{ star }}★</span>
+              <div class="progress dist-bar flex-grow-1">
+                <div class="progress-bar bg-warning" style="width: {{ data.pct }}%"></div>
+              </div>
+              <span class="dist-count">{{ data.count }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-8">
+        <h4 class="reviews-title mb-4">
+          Customer Reviews
+          <span class="reviews-count-badge">{{ review_count }}</span>
+        </h4>
+        {% for review in reviews %}
+        <div class="review-card {% if not forloop.last %}mb-3{% endif %}">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="d-flex align-items-center gap-2">
+              <div class="reviewer-avatar">{{ review.username|slice:":1"|upper }}</div>
+              <div>
+                <span class="reviewer-name">{{ review.username }}</span>
+                <div class="review-stars">
+                  {% for s in review.stars %}<i class="bi bi-star-fill text-warning"></i>{% endfor %}
+                  {% for s in review.empty_stars %}<i class="bi bi-star text-muted"></i>{% endfor %}
+                </div>
+              </div>
+            </div>
+            <span class="review-date">{{ review.created_at|date:"M j, Y" }}</span>
+          </div>
+          <p class="review-comment mb-0">{{ review.comment }}</p>
+        </div>
+        {% empty %}
+        <div class="empty-reviews">
+          <i class="bi bi-chat-dots fs-2 text-muted mb-3 d-block"></i>
+          <p class="text-muted">No reviews yet.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Related -->
+  {% if related_products %}
+  <div class="mt-5 pt-3">
+    <h4 class="section-title mb-4">Další v kategorii {{ product.get_category_display }}</h4>
+    <div class="row g-4">
+      {% for rel in related_products %}
+      <div class="col-sm-6 col-lg-3">
+        <div class="product-card h-100">
+          <div class="product-card__img-wrap">
+            {% if rel.image %}
+            <img src="{{ rel.image }}" alt="{{ rel.name }}" class="product-card__img" loading="lazy" />
+            {% else %}
+            <div class="product-card__img-placeholder"><i class="bi bi-image"></i></div>
+            {% endif %}
+            <span class="product-card__category-badge">{{ rel.category }}</span>
+          </div>
+          <div class="product-card__body">
+            <h6 class="product-card__name">{{ rel.name }}</h6>
+            <div class="product-card__footer">
+              <span class="product-card__price">{{ rel.price }}€</span>
+              <a href="/products/{{ rel.pk }}/" class="btn btn-card-view btn-sm">Detail <i class="bi bi-arrow-right ms-1"></i></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Copy listing text to clipboard ─────────────────────────────────────────
+function copyListing(elementId, btn) {
+  const text = document.getElementById(elementId).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const original = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
+    btn.classList.add('btn-copy--success');
+    setTimeout(() => {
+      btn.innerHTML = original;
+      btn.classList.remove('btn-copy--success');
+    }, 2000);
+  });
+}
+
+// ── Fetch eBay live price via AJAX ──────────────────────────────────────────
+function fetchEbayPrice(productId) {
+  const btn = document.getElementById('ebayCheckBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking eBay…';
+
+  const csrfToken = document.querySelector('#ebayCheckForm [name="csrfmiddlewaretoken"]').value;
+  fetch(`/products/${productId}/ebay-check/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrfToken, 'Accept': 'application/json' }
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.available) {
+        // Build price row
+        const lowest  = data.lowest  ? `€${data.lowest}`  : '—';
+        const highest = data.highest ? `€${data.highest}` : '—';
+        const avg     = `€${data.avg}`;
+
+        // Verdict
+        const myPrice = {{ product.price }};
+        const diff    = data.avg - myPrice;
+        const verdictClass = diff > 0 ? 'ebay-verdict--good' : 'ebay-verdict--warn';
+        const arrow   = diff > 0 ? 'up' : 'down';
+        const absDiff = Math.abs(diff);
+        const verdictText = diff > 0
+          ? `eBay avg is <strong>€${absDiff}</strong> higher than your price — good margin!`
+          : `eBay avg is <strong>€${absDiff}</strong> below your price — consider lowering.`;
+
+        const html = `
+          <div class="row g-2 mt-1">
+            <div class="col-4">
+              <div class="ebay-stat">
+                <span class="ebay-stat__label">Lowest</span>
+                <span class="ebay-stat__value text-success">${lowest}</span>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="ebay-stat ebay-stat--main">
+                <span class="ebay-stat__label">Avg</span>
+                <span class="ebay-stat__value">${avg}</span>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="ebay-stat">
+                <span class="ebay-stat__label">Highest</span>
+                <span class="ebay-stat__value text-danger">${highest}</span>
+              </div>
+            </div>
+          </div>
+          <div class="ebay-verdict mt-2 ${verdictClass}">
+            <i class="bi bi-arrow-${arrow}-circle-fill me-1"></i>${verdictText}
+          </div>`;
+
+        // Replace empty state or old data
+        const empty = document.getElementById('ebayEmpty');
+        if (empty) empty.remove();
+        let dataDiv = document.getElementById('ebayData');
+        if (!dataDiv) {
+          dataDiv = document.createElement('div');
+          dataDiv.id = 'ebayData';
+          dataDiv.className = 'ebay-price-data';
+          btn.parentNode.insertBefore(dataDiv, btn);
+        }
+        dataDiv.innerHTML = html;
+        let sampleNote = document.getElementById('ebaySampleNote');
+        if (!sampleNote) {
+          sampleNote = document.createElement('p');
+          sampleNote.id = 'ebaySampleNote';
+          sampleNote.className = 'market-data-note mt-2 mb-0';
+          dataDiv.appendChild(sampleNote);
+        }
+        sampleNote.textContent = `Vzorek ${data.total_results || 0} aktivních nabídek. Nejde o potvrzené prodejní ceny.`;
+
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Refresh eBay Price';
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Error — Retry';
+        alert('eBay check failed: ' + (data.error || 'Unknown error'));
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-search me-2"></i>Check eBay Price';
+      alert('Request failed: ' + err);
+    });
+}
+</script>
+{% endblock %}

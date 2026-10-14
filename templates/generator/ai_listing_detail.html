@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}{{ listing.ai_title }} — ResaleAI{% endblock %}
+
+{% block content %}
+
+<div class="page-header page-header--slim">
+  <div class="container">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb breadcrumb-dark mb-0">
+        <li class="breadcrumb-item"><a href="/">Domů</a></li>
+        <li class="breadcrumb-item"><a href="/my-ai-listings/">Moje listingy</a></li>
+        <li class="breadcrumb-item active">{{ listing.product_name|truncatechars:30 }}</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="container py-5">
+  <div class="row g-5">
+
+    <!-- ── Left: výsledky ── -->
+    <div class="col-lg-8">
+
+      <!-- Header -->
+      <div class="mb-4">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="gen-card__category">{{ listing.get_product_category_display }}</span>
+          <span class="cond-badge-inline">{{ listing.get_condition_display }}</span>
+          <span class="demand-pill demand-{{ listing.demand_score|lower }}">
+            <i class="bi bi-lightning-charge-fill me-1"></i>Poptávka: {{ listing.get_demand_score_display }}
+          </span>
+          <span class="inventory-status inventory-status--{{ listing.status }}">{{ listing.get_status_display }}</span>
+          <span class="private-badge ms-auto"><i class="bi bi-lock-fill me-1"></i>Soukromé</span>
+        </div>
+        <h1 class="detail-title">{{ listing.ai_title }}</h1>
+        <p class="text-muted small">
+          <i class="bi bi-clock me-1"></i>{{ listing.created_at|date:"j. n. Y · H:i" }}
+          &nbsp;·&nbsp;
+          <i class="bi bi-person me-1"></i>{{ listing.owner.username }}
+        </p>
+      </div>
+
+      <!-- ══ VERDICT BANNER ══ -->
+      {% if listing.ebay_avg_price and listing.ebay_currency == "USD" %}
+      <div class="alert alert-warning" role="alert">
+        Tato starší nabídka použila USD ceny proti vstupům v EUR. Historický verdikt a odhad proto nemusí být srovnatelné; pro nové srovnání vytvoř nabídku znovu.
+      </div>
+      {% endif %}
+      <div class="verdict-banner verdict-banner--{{ listing.price_verdict }} mb-4">
+        <div class="verdict-banner__icon">
+          <i class="bi {{ listing.verdict_icon }}"></i>
+        </div>
+        <div class="verdict-banner__body">
+          <div class="verdict-banner__label">
+            {% if listing.price_verdict == "great" %}Skvělá cena!
+            {% elif listing.price_verdict == "fair" %}Férová cena
+            {% elif listing.price_verdict == "high" %}Cena příliš vysoká
+            {% else %}Bez tržních dat{% endif %}
+          </div>
+          <p class="verdict-banner__msg mb-0">{{ listing.verdict_message }}</p>
+        </div>
+      </div>
+
+      <!-- ══ eBay DATA ══ -->
+      {% if listing.ebay_avg_price %}
+      <div class="ebay-live-card mb-4">
+        <div class="ebay-live-card__header">
+          <i class="bi bi-graph-up-arrow me-2 text-accent"></i>
+          <span>Aktivní nabídkové ceny na eBay</span>
+          <span class="ms-auto ebay-live-badge">{{ listing.ebay_currency }}</span>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-4">
+            <div class="ebay-stat">
+              <span class="ebay-stat__label">Nejnižší</span>
+              <span class="ebay-stat__value text-success">{{ listing.ebay_currency }} {{ listing.ebay_lowest_price|default:"—" }}</span>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="ebay-stat ebay-stat--main">
+              <span class="ebay-stat__label">Průměr</span>
+              <span class="ebay-stat__value">{{ listing.ebay_currency }} {{ listing.ebay_avg_price }}</span>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="ebay-stat">
+              <span class="ebay-stat__label">Nejvyšší</span>
+              <span class="ebay-stat__value text-danger">{{ listing.ebay_currency }} {{ listing.ebay_highest_price|default:"—" }}</span>
+            </div>
+          </div>
+        </div>
+        <p class="market-data-note mb-0">
+          Vzorek {{ listing.ebay_result_count }} aktivních nabídek
+          {% if listing.ebay_fetched_at %}· aktualizováno {{ listing.ebay_fetched_at|date:"j. n. Y H:i" }}{% endif %}.
+          Nejde o potvrzené prodejní ceny.
+        </p>
+      </div>
+      {% endif %}
+
+      <!-- ══ OBRÁZEK (pokud existuje) ══ -->
+      {% if listing.image or listing.image_url %}
+      <div class="listing-image-wrap mb-4">
+        {% if listing.image %}
+        <img src="{{ listing.image.url }}" alt="{{ listing.product_name }}" class="listing-image" />
+        {% else %}
+        <img src="{{ listing.image_url }}" alt="{{ listing.product_name }}" class="listing-image" />
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- ══ AI POPISEK ══ -->
+      <div class="description-block mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="detail-section-label mb-0">
+            <i class="bi bi-cpu me-1 text-accent"></i>AI Popisek
+          </h6>
+          <button class="btn btn-copy" id="copyBtn" onclick="copyDescription()">
+            <i class="bi bi-clipboard me-1"></i>Kopírovat
+          </button>
+        </div>
+        <div class="description-textarea" id="listingText" style="white-space:pre-line;">{{ listing.ai_description }}</div>
+      </div>
+
+      <!-- ══ PLATFORMY ══ -->
+      <div class="platform-actions mb-4">
+        <h6 class="detail-section-label mb-3">
+          <i class="bi bi-share me-1 text-accent"></i>Zkopírovat na platformu
+        </h6>
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <div class="platform-card">
+              <div class="platform-card__logo platform-card__logo--vinted">
+                <i class="bi bi-bag-heart-fill"></i> Vinted
+              </div>
+              <p class="platform-card__hint">Vlož popisek + název do Vinted formuláře.</p>
+              <button class="btn btn-platform-copy w-100" onclick="copyListing('vintedCopyText', this)">
+                <i class="bi bi-clipboard me-1"></i>Kopírovat nabídku
+              </button>
+              <a href="https://www.vinted.com/sell" target="_blank" rel="noopener"
+                 class="btn btn-platform-link w-100 mt-2">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Otevřít Vinted
+              </a>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="platform-card">
+              <div class="platform-card__logo platform-card__logo--ebay">
+                <i class="bi bi-shop-window-fill"></i> eBay
+              </div>
+              <p class="platform-card__hint">Vlož popisek + název do eBay formuláře.</p>
+              <button class="btn btn-platform-copy w-100" onclick="copyListing('ebayCopyText', this)">
+                <i class="bi bi-clipboard me-1"></i>Kopírovat nabídku
+              </button>
+              <a href="https://www.ebay.com/sell" target="_blank" rel="noopener"
+                 class="btn btn-platform-link w-100 mt-2">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Otevřít eBay
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="visually-hidden" id="vintedCopyText">{{ listing.vinted_title }}
+
+      {{ listing.vinted_description }}</div>
+        <div class="visually-hidden" id="ebayCopyText">{{ listing.ebay_title }}
+
+      {{ listing.ebay_description }}</div>
+      </div>
+
+    </div>
+
+    <!-- ── Right: metriky + akce ── -->
+    <div class="col-lg-4">
+
+      <div class="metrics-sidebar mb-4">
+        <h6 class="metrics-sidebar__heading">
+          <i class="bi bi-graph-up-arrow me-2 text-accent"></i>AI Analýza
+        </h6>
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <span class="metric-box__label">Pořizovací cena</span>
+            <span class="metric-box__value">{{ listing.original_price }}€</span>
+          </div>
+          <div class="metric-box metric-box--highlight">
+            <span class="metric-box__label">Doporučená cena</span>
+            <span class="metric-box__value text-accent">{{ listing.estimated_resale_price }}€</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-box__label">Doprava a balení</span>
+            <span class="metric-box__value">{{ listing.shipping_cost }}€</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-box__label">Odhad poplatků</span>
+            <span class="metric-box__value">{{ listing.platform_fee_estimate|floatformat:2 }}€</span>
+          </div>
+          <div class="metric-box metric-box--highlight">
+            <span class="metric-box__label">Odhad čistého zisku</span>
+            <span class="metric-box__value {% if listing.net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ listing.net_profit|floatformat:2 }}€</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-box__label">Poptávka</span>
+            <span class="metric-box__value demand-{{ listing.demand_score|lower }}">{{ listing.get_demand_score_display }}</span>
+          </div>
+        </div>
+
+        <div class="input-summary mt-3">
+          <div class="input-summary__row">
+            <span class="input-summary__label">Položka</span>
+            <span class="input-summary__value">{{ listing.product_name }}</span>
+          </div>
+          <div class="input-summary__row">
+            <span class="input-summary__label">Kategorie</span>
+            <span class="input-summary__value">{{ listing.get_product_category_display }}</span>
+          </div>
+          <div class="input-summary__row">
+            <span class="input-summary__label">Stav</span>
+            <span class="input-summary__value">{{ listing.get_condition_display }}</span>
+          </div>
+          <div class="input-summary__row">
+            <span class="input-summary__label">Vygenerováno</span>
+            <span class="input-summary__value">{{ listing.created_at|date:"j. n. Y" }}</span>
+          </div>
+        </div>
+      </div>
+
+      <form method="post" action="{% url 'update_ai_listing' listing.pk %}" class="listing-workflow-form mb-4">
+        {% csrf_token %}
+        <h6 class="metrics-sidebar__heading">Evidence prodeje</h6>
+        <label class="form-label-custom" for="id_status">Stav nabídky</label>
+        {{ workflow_form.status }}
+        {% if workflow_form.status.errors %}<div class="form-error">{{ workflow_form.status.errors.0 }}</div>{% endif %}
+        <label class="form-label-custom mt-3" for="id_actual_sale_price">Skutečná prodejní cena (€)</label>
+        {{ workflow_form.actual_sale_price }}
+        {% if workflow_form.actual_sale_price.errors %}<div class="form-error">{{ workflow_form.actual_sale_price.errors.0 }}</div>{% endif %}
+        <label class="form-label-custom mt-3" for="id_actual_shipping_cost">Skutečná doprava (€)</label>
+        {{ workflow_form.actual_shipping_cost }}
+        {% if workflow_form.actual_shipping_cost.errors %}<div class="form-error">{{ workflow_form.actual_shipping_cost.errors.0 }}</div>{% endif %}
+        <label class="form-label-custom mt-3" for="id_actual_platform_fee">Skutečný poplatek platformy (€)</label>
+        {{ workflow_form.actual_platform_fee }}
+        {% if workflow_form.actual_platform_fee.errors %}<div class="form-error">{{ workflow_form.actual_platform_fee.errors.0 }}</div>{% endif %}
+        <p class="form-hint mt-2">Nech náklady prázdné pro výpočet z původních odhadů.</p>
+        {% if listing.realized_net_profit is not None %}
+        <p class="small mt-2 mb-0">Čistý výsledek prodeje: <strong>{{ listing.realized_net_profit|floatformat:2 }} €</strong></p>
+        {% endif %}
+        <label class="form-label-custom mt-3" for="id_notes">Soukromé poznámky</label>
+        {{ workflow_form.notes }}
+        <button type="submit" class="btn btn-list-item w-100 mt-3">Uložit stav</button>
+      </form>
+
+      <div class="d-grid gap-2">
+        <a href="/generate-listing/" class="btn btn-generate">
+          <i class="bi bi-plus-circle me-2"></i>Nový listing
+        </a>
+        <a href="/my-ai-listings/" class="btn btn-outline-muted">
+          <i class="bi bi-collection me-2"></i>Všechny moje listingy
+        </a>
+        <form method="post" action="/my-ai-listings/{{ listing.pk }}/delete/"
+              onsubmit="return confirm('Smazat tento listing natrvalo?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-delete-listing w-100">
+            <i class="bi bi-trash me-2"></i>Smazat listing
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyDescription() {
+  const text = document.getElementById('listingText').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Zkopírováno!';
+    btn.classList.add('btn-copy--success');
+    setTimeout(() => {
+      btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Kopírovat';
+      btn.classList.remove('btn-copy--success');
+    }, 2500);
+  });
+}
+
+function copyListing(elementId, button) {
+  const text = document.getElementById(elementId).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const original = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-check2 me-1"></i>Zkopírováno';
+    setTimeout(() => { button.innerHTML = original; }, 2000);
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}ResaleAI — nástroje pro prodej z druhé ruky{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════ HERO ═══════════════════════════════ -->
+<section class="hero-section">
+  <div class="hero-grid"></div>
+  <div class="container position-relative">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-9">
+
+        <div class="hero-badge mb-4">
+          <span class="pulse-dot"></span>
+          Cenový odhad · Evidence položek · Texty k vystavení
+        </div>
+
+        <h1 class="hero-headline">
+          Prodávej s přehledem.<br/>
+          <span class="gradient-text">Počítej čistý zisk.</span>
+        </h1>
+
+        <p class="hero-sub">
+          Připrav nabídku, započítej poplatky a sleduj, jak si tvoje položky vedou od konceptu až po prodej.
+        </p>
+
+        <div class="d-flex flex-wrap gap-3 justify-content-center mt-5">
+          <a href="{% if request.user.is_authenticated and not request.user.is_staff %}{% url 'seller_dashboard' %}{% else %}/products/{% endif %}" class="btn btn-hero-primary">
+            <i class="bi bi-grid-fill me-2"></i>{% if request.user.is_authenticated and not request.user.is_staff %}Otevřít přehled{% else %}Prohlédnout katalog{% endif %}
+          </a>
+          <a href="{% if request.user.is_staff %}/products/add/{% elif request.user.is_authenticated %}{% url 'generate_listing' %}{% else %}/register/{% endif %}" class="btn btn-hero-secondary">
+            <i class="bi bi-plus-circle me-2"></i>{% if request.user.is_staff %}Přidat produkt{% elif request.user.is_authenticated %}Přidat položku{% else %}Začít zdarma{% endif %}
+          </a>
+        </div>
+
+        <!-- Floating trust badges -->
+        <div class="d-flex flex-wrap gap-3 justify-content-center mt-5">
+          <span class="trust-chip"><i class="bi bi-calculator me-1 text-accent"></i>Čistý zisk</span>
+          <span class="trust-chip"><i class="bi bi-box-seam me-1 text-accent"></i>Evidence nabídek</span>
+          <span class="trust-chip"><i class="bi bi-graph-up me-1 text-accent"></i>Ceny aktivních nabídek</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ STATS ══════════════════════════════ -->
+<section class="stats-section">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <span class="stat-number">{{ stats.total_products }}</span>
+        <span class="stat-label">Produkty v katalogu</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-number">{{ stats.total_reviews }}</span>
+        <span class="stat-label">Hodnocení</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-number">{{ stats.total_categories }}</span>
+        <span class="stat-label">Kategorie</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-number">{{ stats.high_demand }}</span>
+        <span class="stat-label">Vysoká poptávka</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ HOW IT WORKS ══════════════════════ -->
+<section class="section-padded">
+  <div class="container">
+    <div class="section-header text-center">
+      <span class="section-label">Postup</span>
+      <h2 class="section-title">Od položky k přehledu o zisku</h2>
+      <p class="section-sub">Měj podklady k nabídce i náklady na jednom místě.</p>
+    </div>
+
+    <div class="row g-4 mt-2">
+      <div class="col-md-4">
+        <div class="step-card">
+          <div class="step-number">01</div>
+          <div class="step-icon"><i class="bi bi-camera-fill"></i></div>
+          <h5 class="step-title">Přidej položku</h5>
+          <p class="step-text">Zapiš stav, pořizovací cenu, náklady a vlastní popis.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="step-card step-card--accent">
+          <div class="step-number">02</div>
+          <div class="step-icon"><i class="bi bi-cpu-fill"></i></div>
+          <h5 class="step-title">Připrav nabídku</h5>
+          <p class="step-text">Získej orientační cenu a samostatný text pro vybranou platformu.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="step-card">
+          <div class="step-number">03</div>
+          <div class="step-icon"><i class="bi bi-graph-up-arrow"></i></div>
+          <h5 class="step-title">Sleduj výsledek</h5>
+          <p class="step-text">Po prodeji zadej skutečnou cenu a porovnej čistý výsledek s odhadem.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ FEATURED PRODUCTS ═════════════════ -->
+<section class="section-padded bg-section-alt">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-end mb-5">
+      <div>
+        <span class="section-label">Katalog</span>
+        <h2 class="section-title mb-0">Nedávno přidané</h2>
+      </div>
+      <a href="/products/" class="btn btn-outline-muted">
+        Zobrazit vše <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+
+    <div class="row g-4">
+      {% for product in featured_products %}
+      <div class="col-sm-6 col-lg-4">
+        <div class="product-card h-100">
+          <div class="product-card__img-wrap">
+            {% if product.image %}
+            <img src="{{ product.image }}" alt="{{ product.name }}" class="product-card__img" loading="lazy" />
+            {% else %}
+            <div class="product-card__img-placeholder">
+              <i class="bi bi-image"></i>
+            </div>
+            {% endif %}
+            <span class="product-card__category-badge">{{ product.category }}</span>
+            <span class="product-card__demand demand-{{ product.demand_score|lower }}">
+              {{ product.demand_score }} Demand
+            </span>
+          </div>
+          <div class="product-card__body">
+            <h6 class="product-card__name">{{ product.name }}</h6>
+            <p class="product-card__desc">{{ product.description|truncatechars:80 }}</p>
+            <div class="product-card__footer">
+              <div>
+                <span class="product-card__price">{{ product.price }}€</span>
+                {% if product.estimated_price %}
+                <span class="product-card__est-price">Est. {{ product.estimated_price }}€</span>
+                {% endif %}
+              </div>
+              <a href="/products/{{ product.pk }}/" class="btn btn-card-view">
+                Detail <i class="bi bi-arrow-right ms-1"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-12 text-center py-5">
+        <p class="text-muted">Katalog je zatím prázdný.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ TRENDING PREVIEW ══════════════════ -->
+<section class="section-padded">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-end mb-5">
+      <div>
+        <span class="section-label">Přehled trhu</span>
+        <h2 class="section-title mb-0">Sledované trendy</h2>
+      </div>
+      <a href="/trending/" class="btn btn-outline-muted">
+        Všechny trendy <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+
+    <div class="row g-4">
+      {% for trend in top_trends %}
+      <div class="col-md-4">
+        <div class="trend-preview-card">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <span class="trend-preview__category">{{ trend.category }}</span>
+            <span class="trend-hot-label">{{ trend.popularity_label }}</span>
+          </div>
+          <h5 class="trend-preview__name">{{ trend.name }}</h5>
+          <p class="trend-preview__desc">{{ trend.description|truncatechars:100 }}</p>
+          <div class="mt-3">
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted">Oblíbenost</small>
+              <small class="fw-600 text-accent">{{ trend.popularity_score }}/100</small>
+            </div>
+            <div class="progress trend-progress">
+              <div class="progress-bar bg-{{ trend.bar_color }}" style="width: {{ trend.popularity_score }}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ CTA BANNER ════════════════════════ -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-card">
+      <div class="cta-glow"></div>
+      <div class="row align-items-center position-relative">
+        <div class="col-lg-8">
+          <h2 class="cta-title">Připraven/a přidat první položku?</h2>
+          <p class="cta-sub">Zaznamenej náklady, připrav text nabídky a sleduj čistý zisk.</p>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+          <a href="/products/add/" class="btn btn-cta-main me-2">
+            <i class="bi bi-plus-circle-fill me-2"></i>Přidat položku
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

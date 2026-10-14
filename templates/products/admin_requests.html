@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Admin Requests — ResaleAI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="container">
+    <h1 class="page-header__title mb-1">Admin Requests</h1>
+    <p class="page-header__sub">Review all user interest requests and continue the conversation directly.</p>
+  </div>
+</div>
+
+<div class="container py-5">
+  {% if requests %}
+  <div class="row g-4">
+    {% for item in requests %}
+    <div class="col-lg-6">
+      <div class="card glass-card h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h5 class="card-title mb-1">{{ item.product.name }}</h5>
+              <p class="text-muted mb-0">Requester: {{ item.requester.username }}</p>
+            </div>
+            <span class="badge {% if item.status == 'closed' %}bg-secondary{% else %}bg-warning{% endif %}">{{ item.status|title }}</span>
+          </div>
+          <p class="small text-muted mb-3">{{ item.message|default:"No extra note provided." }}</p>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="small text-muted">Created {{ item.created_at|date:"M d, H:i" }}</span>
+            <a class="btn btn-list-item btn-sm" href="{% url 'request_chat' item.pk %}">Open chat</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state text-center py-5">
+    <div class="empty-state__icon mb-4"><i class="bi bi-chat-left-dots"></i></div>
+    <h4 class="empty-state__title">No requests yet</h4>
+    <p class="text-muted">When a user clicks “Mám zájem”, the request will appear here.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

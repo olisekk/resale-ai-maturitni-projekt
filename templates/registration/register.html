@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Vytvoření účtu — ResaleAI{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-sm-10 col-md-7 col-lg-5">
+
+        <div class="auth-card">
+          <div class="auth-card__header">
+            <div class="auth-logo">
+              <div class="brand-orb">⚡</div>
+            </div>
+            <h2 class="auth-title">Vytvoř si účet</h2>
+            <p class="auth-sub">Získej svůj soukromý prodejní přehled</p>
+          </div>
+
+          <div class="auth-card__body">
+            <form method="post" novalidate>
+              {% csrf_token %}
+
+              <div class="mb-3">
+                <label class="form-label-custom">
+                  <i class="bi bi-person me-1"></i>Uživatelské jméno <span class="required-star">*</span>
+                </label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                <div class="form-error">{{ form.username.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label-custom">
+                  <i class="bi bi-envelope me-1"></i>E-mail
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                <div class="form-error">{{ form.email.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label-custom">
+                  <i class="bi bi-lock me-1"></i>Heslo <span class="required-star">*</span>
+                </label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                <div class="form-error">{{ form.password.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label-custom">
+                  <i class="bi bi-lock-fill me-1"></i>Potvrdit heslo <span class="required-star">*</span>
+                </label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                <div class="form-error">{{ form.password2.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="register-perks mb-4">
+                <div class="perk-item">
+                  <i class="bi bi-cpu-fill text-accent"></i>
+                  <span>Návrhy názvů a popisů pro platformy</span>
+                </div>
+                <div class="perk-item">
+                  <i class="bi bi-graph-up-arrow text-accent"></i>
+                  <span>Orientační odhad ceny a poplatků</span>
+                </div>
+                <div class="perk-item">
+                  <i class="bi bi-shield-lock-fill text-accent"></i>
+                  <span>Soukromé nabídky viditelné jen tobě</span>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-auth-submit w-100">
+                Vytvořit účet <i class="bi bi-arrow-right ms-2"></i>
+              </button>
+            </form>
+          </div>
+
+          <div class="auth-card__footer">
+            Už účet máš?
+            <a href="/login/" class="auth-switch-link">Přihlásit se</a>
+          </div>
+        </div>
+
+        <div class="text-center mt-4">
+          <a href="/" class="back-home-link">
+            <i class="bi bi-arrow-left me-1"></i>Zpět na ResaleAI
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

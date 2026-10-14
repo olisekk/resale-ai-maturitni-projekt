@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Generate AI Listing — ResaleAI{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="container">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb breadcrumb-dark mb-2">
+        <li class="breadcrumb-item"><a href="/">Domů</a></li>
+        <li class="breadcrumb-item active">AI Listing Generator</li>
+      </ol>
+    </nav>
+    <div class="d-flex align-items-center gap-3 mb-1">
+      <h1 class="page-header__title mb-0">AI Listing Generator</h1>
+      <span class="private-badge"><i class="bi bi-lock-fill me-1"></i>Private</span>
+    </div>
+    <p class="page-header__sub">
+      Zadej detaily položky — AI vygeneruje popisek, odhadne cenu a porovná s eBay trhem.
+    </p>
+  </div>
+</div>
+
+<div class="container py-5">
+  <div class="row g-5">
+
+    <!-- ── Form ── -->
+    <div class="col-lg-7">
+      <div class="generator-card">
+        <div class="generator-card__header">
+          <div class="ai-icon-wrap me-3"><i class="bi bi-cpu-fill"></i></div>
+          <div>
+            <h5 class="mb-0">O čem je tvá položka?</h5>
+            <small class="text-muted">Orientační cenový odhad a podklady k nabídce</small>
+          </div>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="generator-card__body" novalidate>
+          {% csrf_token %}
+
+          <!-- Název -->
+          <div class="mb-4">
+            <label class="form-label-custom">
+              <i class="bi bi-tag me-1"></i>Co prodáváš? <span class="required-star">*</span>
+            </label>
+            {{ form.product_name }}
+            {% if form.product_name.errors %}<div class="form-error">{{ form.product_name.errors.0 }}</div>{% endif %}
+            <div class="form-hint">Co konkrétnější, tím lepší AI výsledek. Např. <em>„Nike Air Jordan 1 Chicago vel. 44"</em></div>
+          </div>
+
+          <!-- Fotka -->
+          <div class="mb-4">
+            <label class="form-label-custom">
+              <i class="bi bi-image me-1"></i>Fotka položky <span class="text-muted fw-normal">(nepovinné, max. 8 MB)</span>
+            </label>
+            {{ form.image }}
+            {% if form.image.errors %}<div class="form-error">{{ form.image.errors.0 }}</div>{% endif %}
+            <div class="form-hint">Fotku můžeš nahrát přímo. Podporované jsou běžné formáty obrázků.</div>
+            <label class="form-label-custom mt-3" for="id_image_url">Nebo odkaz na fotku</label>
+            {{ form.image_url }}
+            {% if form.image_url.errors %}<div class="form-error">{{ form.image_url.errors.0 }}</div>{% endif %}
+
+            <div id="imgPreviewWrap" class="mt-3" style="display:none;">
+              <img id="imgPreview" src="" alt="Preview" class="img-preview-thumb" />
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label-custom"><i class="bi bi-card-text me-1"></i>Popis a důležité detaily</label>
+            {{ form.description }}
+            {% if form.description.errors %}<div class="form-error">{{ form.description.errors.0 }}</div>{% endif %}
+          </div>
+
+          <!-- Kategorie + Kondice -->
+          <div class="row g-4 mb-4">
+            <div class="col-sm-6">
+              <label class="form-label-custom">
+                <i class="bi bi-grid me-1"></i>Kategorie <span class="required-star">*</span>
+              </label>
+              {{ form.product_category }}
+              {% if form.product_category.errors %}<div class="form-error">{{ form.product_category.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label-custom">
+                <i class="bi bi-star me-1"></i>Stav / Kondice <span class="required-star">*</span>
+              </label>
+              {{ form.condition }}
+              {% if form.condition.errors %}<div class="form-error">{{ form.condition.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <!-- Náklady -->
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6">
+            <label class="form-label-custom">
+              <i class="bi bi-currency-euro me-1"></i>Pořizovací cena (€) <span class="required-star">*</span>
+            </label>
+            {{ form.original_price }}
+            {% if form.original_price.errors %}<div class="form-error">{{ form.original_price.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label-custom">Doprava a balení (€)</label>
+              {{ form.shipping_cost }}
+              {% if form.shipping_cost.errors %}<div class="form-error">{{ form.shipping_cost.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label-custom">Platforma</label>
+              {{ form.selling_platform }}
+              {% if form.selling_platform.errors %}<div class="form-error">{{ form.selling_platform.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label-custom">Poplatek platformy (%)</label>
+              {{ form.platform_fee_percent }}
+              {% if form.platform_fee_percent.errors %}<div class="form-error">{{ form.platform_fee_percent.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label-custom">Pevný poplatek (€)</label>
+              {{ form.platform_fee_fixed }}
+              {% if form.platform_fee_fixed.errors %}<div class="form-error">{{ form.platform_fee_fixed.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-12 form-hint">Poplatky zadej podle svého účtu a zvolené platformy; sazby se mohou měnit.</div>
+          </div>
+
+          <button type="submit" class="btn btn-generate w-100" id="generateBtn">
+            <i class="bi bi-cpu-fill me-2"></i>Generovat AI listing
+            <span class="btn-generate__badge">Zdarma</span>
+          </button>
+
+          <!-- Loading state -->
+          <div id="loadingState" class="loading-state mt-3" style="display:none;">
+            <div class="spinner-border text-accent spinner-border-sm me-2"></div>
+            <span>Připravuji cenový odhad a text nabídky…</span>
+          </div>
+        </form>
+      </div>
+
+      <!-- How it works -->
+      <div class="how-strip mt-4">
+        <div class="how-strip__item"><i class="bi bi-1-circle-fill text-accent"></i><span>Vyplníš formulář</span></div>
+        <div class="how-strip__arrow"><i class="bi bi-arrow-right text-muted"></i></div>
+          <div class="how-strip__item"><i class="bi bi-cpu-fill text-accent"></i><span>Odhad a ceny aktivních eBay nabídek</span></div>
+        <div class="how-strip__arrow"><i class="bi bi-arrow-right text-muted"></i></div>
+        <div class="how-strip__item"><i class="bi bi-clipboard-check-fill text-accent"></i><span>Kopíruješ na Vinted/eBay</span></div>
+      </div>
+    </div>
+
+    <!-- ── Sidebar ── -->
+    <div class="col-lg-4 d-none d-lg-block">
+      <div class="ai-preview-sidebar mb-4">
+        <h6 class="ai-preview__heading">
+            <i class="bi bi-cpu-fill me-2 text-accent"></i>Co získáš
+        </h6>
+        <ul class="ai-preview__list">
+          <li>
+            <i class="bi bi-check-circle-fill text-accent"></i>
+            <div>
+              <strong>Orientační prodejní cena</strong>
+              <p>Odhad zohlední stav, pořizovací cenu a dostupné nabídkové ceny.</p>
+            </div>
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-accent"></i>
+            <div>
+              <strong>Porovnání s eBay nabídkami</strong>
+              <p>Vzorek aktivních nabídek, nikoli potvrzených prodejů.</p>
+            </div>
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-accent"></i>
+            <div>
+              <strong>Ukáže cenový signál</strong>
+              <p>Porovnání je orientační; ověř také stav a příslušenství.</p>
+            </div>
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-accent"></i>
+            <div>
+              <strong>Připraví texty pro platformy</strong>
+              <p>Samostatný návrh pro Vinted a eBay můžeš před vystavením upravit.</p>
+            </div>
+          </li>
+        </ul>
+        <div class="ai-preview__tip">
+          <i class="bi bi-shield-lock-fill text-accent me-2"></i>
+          <span>Vše je <strong>soukromé</strong> — vidíš jen ty.</span>
+        </div>
+      </div>
+
+      <!-- Condition guide -->
+      <div class="condition-guide">
+        <h6 class="condition-guide__heading">
+          <i class="bi bi-info-circle me-2 text-accent"></i>Průvodce stavem
+        </h6>
+        <div class="condition-row"><span class="cond-badge cond-new">Nové</span><span>S originálními štítky, nepoužité</span></div>
+        <div class="condition-row"><span class="cond-badge cond-likenew">Jako nové</span><span>Téměř bez známek používání</span></div>
+        <div class="condition-row"><span class="cond-badge cond-verygood">Velmi dobrý</span><span>Jen drobné stopy používání</span></div>
+        <div class="condition-row"><span class="cond-badge cond-good">Dobrý</span><span>Běžné známky používání</span></div>
+        <div class="condition-row"><span class="cond-badge cond-fair">Opotřebený</span><span>Viditelné opotřebení, funkční</span></div>
+      </div>
+
+      {% if recent %}
+      <div class="sidebar-recent mt-4">
+        <h6 class="sidebar-recent__heading">
+          <i class="bi bi-clock-history me-2 text-accent"></i>Poslední listingy
+        </h6>
+        {% for item in recent %}
+        <a href="/my-ai-listings/{{ item.pk }}/" class="recent-listing-row">
+          <div class="recent-listing-row__name">{{ item.product_name|truncatechars:28 }}</div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="demand-pill demand-{{ item.demand_score|lower }}">{{ item.get_demand_score_display }}</span>
+            <span class="recent-listing-row__price">{{ item.estimated_resale_price }}€</span>
+          </div>
+        </a>
+        {% endfor %}
+        <a href="/my-ai-listings/" class="btn btn-outline-muted btn-sm w-100 mt-2">
+          Zobrazit vše <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Image URL live preview
+const imageInput = document.querySelector('input[name="image_url"]');
+const previewWrap = document.getElementById('imgPreviewWrap');
+const previewImg  = document.getElementById('imgPreview');
+
+if (imageInput) {
+  imageInput.addEventListener('input', function() {
+    const url = this.value.trim();
+    if (url) {
+      previewImg.src = url;
+      previewImg.onload  = () => previewWrap.style.display = 'block';
+      previewImg.onerror = () => previewWrap.style.display = 'none';
+    } else {
+      previewWrap.style.display = 'none';
+    }
+  });
+}
+
+const uploadInput = document.querySelector('input[name="image"]');
+if (uploadInput) {
+  uploadInput.addEventListener('change', function() {
+    const file = this.files && this.files[0];
+    if (file) {
+      previewImg.src = URL.createObjectURL(file);
+      previewWrap.style.display = 'block';
+    }
+  });
+}
+
+// Loading state on submit
+document.querySelector('form').addEventListener('submit', function() {
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('generateBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generuji…';
+  document.getElementById('loadingState').style.display = 'flex';
+});
+</script>
+{% endblock %}

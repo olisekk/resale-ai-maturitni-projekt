@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Katalog — ResaleAI{% endblock %}
+
+{% block content %}
+
+<!-- ════════════════════════════════════ PAGE HEADER ═════════════════════════ -->
+<div class="page-header">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-7">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb breadcrumb-dark mb-2">
+            <li class="breadcrumb-item"><a href="/">Domů</a></li>
+            <li class="breadcrumb-item active">Katalog</li>
+          </ol>
+        </nav>
+        <h1 class="page-header__title">
+          {% if search_query %}
+            Výsledky pro „{{ search_query }}“
+          {% elif selected_category %}
+            {{ selected_category }}
+          {% else %}
+            Všechny produkty
+          {% endif %}
+        </h1>
+        <p class="page-header__sub">
+          Nalezeno položek: {{ total_count }}
+          {% if selected_category %} v kategorii <strong>{{ selected_category }}</strong>{% endif %}
+        </p>
+      </div>
+      <div class="col-lg-5 text-lg-end mt-3 mt-lg-0">
+        <a href="/products/add/" class="btn btn-list-item">
+          <i class="bi bi-plus-circle-fill me-2"></i>Přidat produkt
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ FILTERS BAR ════════════════════════ -->
+<div class="filters-bar">
+  <div class="container">
+    <form method="get" class="d-flex flex-wrap align-items-center gap-3">
+
+      <!-- Search -->
+      <div class="search-wrap flex-grow-1">
+        <i class="bi bi-search search-icon"></i>
+        <input
+          type="text"
+          name="search"
+          class="form-control search-input"
+          placeholder="Hledat produkty…"
+          value="{{ search_query }}"
+        />
+      </div>
+
+      <!-- Category Filter -->
+      <div class="filter-group">
+        <select name="category" class="form-select filter-select" onchange="this.form.submit()">
+          <option value="">Všechny kategorie</option>
+          {% for value, label in categories %}
+          <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Sort -->
+      <div class="filter-group">
+        <select name="sort" class="form-select filter-select" onchange="this.form.submit()">
+          <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Nejnovější</option>
+          <option value="price_asc" {% if sort_by == 'price_asc' %}selected{% endif %}>Cena: od nejnižší</option>
+          <option value="price_desc" {% if sort_by == 'price_desc' %}selected{% endif %}>Cena: od nejvyšší</option>
+          <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Název A–Z</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-filter-apply">
+        <i class="bi bi-funnel-fill me-1"></i>Použít
+      </button>
+
+      {% if search_query or selected_category %}
+      <a href="/products/" class="btn btn-filter-clear">
+        <i class="bi bi-x-circle me-1"></i>Vymazat
+      </a>
+      {% endif %}
+
+    </form>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ PRODUCT GRID ════════════════════════ -->
+<div class="container py-5">
+  {% if products %}
+  <div class="row g-4">
+    {% for product in products %}
+    <div class="col-sm-6 col-lg-4 col-xl-3">
+      <div class="product-card h-100">
+
+        <div class="product-card__img-wrap">
+          {% if product.image %}
+          <img src="{{ product.image }}" alt="{{ product.name }}" class="product-card__img" loading="lazy" />
+          {% else %}
+          <div class="product-card__img-placeholder">
+            <i class="bi bi-image fs-1"></i>
+          </div>
+          {% endif %}
+          <span class="product-card__category-badge">{{ product.get_category_display }}</span>
+          <span class="product-card__demand demand-{{ product.demand_score|lower }}">
+            Poptávka: {{ product.get_demand_score_display }}
+          </span>
+        </div>
+
+        <div class="product-card__body">
+          <h6 class="product-card__name">{{ product.name }}</h6>
+          <p class="product-card__desc">{{ product.description|truncatechars:75 }}</p>
+
+          <!-- Rating row -->
+          {% if product.review_count > 0 %}
+          <div class="product-card__rating mb-2">
+            {% with avg=product.average_rating %}
+            {% for i in "12345" %}
+            <i class="bi bi-star{% if forloop.counter <= avg|default:0 %}-fill text-warning{% else %} text-muted{% endif %} small"></i>
+            {% endfor %}
+            <span class="rating-count">({{ product.review_total }})</span>
+            {% endwith %}
+          </div>
+          {% endif %}
+
+          <div class="product-card__footer">
+            <div>
+              <div class="product-card__price">{{ product.price }}€</div>
+              {% if product.estimated_price %}
+              <div class="product-card__est-price">Orientační odhad {{ product.estimated_price }} €</div>
+              {% endif %}
+            </div>
+            <a href="/products/{{ product.pk }}/" class="btn btn-card-view">
+              Detail <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <nav class="mt-5" aria-label="Stránkování katalogu">
+    <ul class="pagination justify-content-center">
+      {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?search={{ search_query|urlencode }}&amp;category={{ selected_category|urlencode }}&amp;sort={{ sort_by }}&amp;page={{ page_obj.previous_page_number }}">Předchozí</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?search={{ search_query|urlencode }}&amp;category={{ selected_category|urlencode }}&amp;sort={{ sort_by }}&amp;page={{ page_obj.next_page_number }}">Další</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="empty-state text-center py-5">
+    <div class="empty-state__icon mb-4">
+      <i class="bi bi-search"></i>
+    </div>
+    <h4 class="empty-state__title">Nenašli jsme žádné produkty</h4>
+    <p class="text-muted mb-4">
+      {% if search_query %}
+        Pro „{{ search_query }}“ nic nemáme. Zkus jiný výraz.
+      {% elif selected_category %}
+        V kategorii {{ selected_category }} zatím nejsou produkty.
+      {% else %}
+        Katalog je zatím prázdný.
+      {% endif %}
+    </p>
+    <div class="d-flex gap-2 justify-content-center">
+      <a href="/products/" class="btn btn-outline-muted">Zrušit filtry</a>
+      <a href="/products/add/" class="btn btn-list-item">Přidat produkt</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

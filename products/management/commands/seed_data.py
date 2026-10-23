@@ -6,7 +6,8 @@ Usage:
     python manage.py seed_data --flush   # wipe then re-seed
 """
 import random
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from products.models import Product, Review, Trend
 
 
@@ -291,6 +292,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError("Ukázková data nelze seedovat při DEBUG=False.")
+
         if options["flush"]:
             self.stdout.write("Flushing existing data…")
             Review.objects.all().delete()

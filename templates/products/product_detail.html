@@ -220,7 +220,8 @@
           {% if request.user.is_authenticated and not request.user.is_staff %}
           <form method="post" action="{% url 'create_product_request' product.pk %}" class="mt-3">
             {% csrf_token %}
-            <input type="text" name="message" class="form-control form-control-sm mb-2" placeholder="Zpráva pro správce (nepovinné)" />
+            {{ product_request_form.message }}
+            {% if product_request_form.message.errors %}<div class="form-error">{{ product_request_form.message.errors.0 }}</div>{% endif %}
             <button type="submit" class="btn btn-list-item w-100">
               <i class="bi bi-hand-thumbs-up me-2"></i>Mám zájem
             </button>

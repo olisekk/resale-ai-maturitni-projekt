@@ -117,7 +117,7 @@
           <p class="product-card__desc">{{ product.description|truncatechars:75 }}</p>
 
           <!-- Rating row -->
-          {% if product.review_count > 0 %}
+          {% if product.review_total > 0 %}
           <div class="product-card__rating mb-2">
             {% with avg=product.average_rating %}
             {% for i in "12345" %}

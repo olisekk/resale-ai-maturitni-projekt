@@ -25,16 +25,18 @@
           <p class="small text-muted mb-2">{{ request_obj.message|default:"Bez doplňující zprávy." }}</p>
           <p class="small text-muted mb-0">Stav: <strong>{{ request_obj.get_status_display }}</strong></p>
           <p class="small text-muted">Vytvořeno: {{ request_obj.created_at|date:"j. n. H:i" }}</p>
-          <form method="post" class="mt-3">
-            {% csrf_token %}
-            <label class="form-label small">Změnit stav</label>
-            <select name="status" class="form-select form-select-sm mb-2">
-              {% for value, label in status_choices %}
-              <option value="{{ value }}" {% if request_obj.status == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit" class="btn btn-list-item btn-sm w-100">Uložit stav</button>
-          </form>
+          {% if request.user.is_staff %}
+            <form method="post" class="mt-3">
+              {% csrf_token %}
+              <label class="form-label small">Změnit stav</label>
+              <select name="status" class="form-select form-select-sm mb-2">
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if request_obj.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-list-item btn-sm w-100">Uložit stav</button>
+            </form>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -59,7 +61,8 @@
           <form method="post" class="mt-auto">
             {% csrf_token %}
             <label class="form-label small">Napsat zprávu</label>
-            <textarea name="message" rows="3" class="form-control mb-2" placeholder="Napiš zprávu…"></textarea>
+            {{ message_form.message }}
+            {% if message_form.message.errors %}<div class="form-error">{{ message_form.message.errors.0 }}</div>{% endif %}
             <button type="submit" class="btn btn-list-item">Odeslat zprávu</button>
           </form>
         </div>

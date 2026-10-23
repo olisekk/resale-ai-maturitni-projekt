@@ -7,6 +7,12 @@ urlpatterns = [
     path("products/",                     views.product_list,     name="product_list"),
     path("products/<int:pk>/",            views.product_detail,   name="product_detail"),
     path("trending/",                     views.trending,         name="trending"),
+        path("marketplace/", views.marketplace_listings, name="marketplace_listings"),
+        path("marketplace/<int:pk>/", views.public_listing_detail, name="public_listing_detail"),
+        path("marketplace/<int:pk>/favorite/", views.toggle_favorite_listing, name="toggle_favorite_listing"),
+        path("marketplace/<int:pk>/report/", views.report_public_listing, name="report_public_listing"),
+        path("sellers/<int:user_id>/", views.seller_profile, name="seller_profile"),
+        path("my-favorites/", views.favorite_listings, name="favorite_listings"),
 
     # ── Admin only ───────────────────────────────────────────────────────────
     path("products/add/",                 views.add_product,      name="add_product"),

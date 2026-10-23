@@ -1,7 +1,16 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.forms import AuthenticationForm
-from .models import Product, GeneratedListing, Category, Condition, ListingStatus
+from django.core.exceptions import ValidationError as DjangoValidationError
+from .models import (
+    Product,
+    GeneratedListing,
+    Category,
+    Condition,
+    ListingStatus,
+    ListingReportReason,
+)
 
 
 class ProductForm(forms.ModelForm):
@@ -21,6 +30,30 @@ class ProductForm(forms.ModelForm):
         if price is not None and price < 0:
             raise forms.ValidationError("Cena nemůže být záporná.")
         return price
+
+
+class ProductRequestForm(forms.Form):
+    message = forms.CharField(
+        required=False,
+        max_length=1000,
+        strip=True,
+        widget=forms.TextInput(attrs={
+            "class": "form-control form-control-sm mb-2",
+            "placeholder": "Zpráva pro správce (nepovinné)",
+        }),
+    )
+
+
+class ProductMessageForm(forms.Form):
+    message = forms.CharField(
+        max_length=2000,
+        strip=True,
+        widget=forms.Textarea(attrs={
+            "class": "form-control mb-2",
+            "rows": 3,
+            "placeholder": "Napiš zprávu…",
+        }),
+    )
 
 
 class GeneratedListingForm(forms.Form):
@@ -108,9 +141,13 @@ class GeneratedListingForm(forms.Form):
 class ListingWorkflowForm(forms.ModelForm):
     class Meta:
         model = GeneratedListing
-        fields = ["status", "actual_sale_price", "actual_shipping_cost", "actual_platform_fee", "notes"]
+        fields = [
+            "status", "is_public", "actual_sale_price", "actual_shipping_cost",
+            "actual_platform_fee", "notes",
+        ]
         widgets = {
             "status": forms.Select(attrs={"class": "form-select"}),
+            "is_public": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "actual_sale_price": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "actual_shipping_cost": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "actual_platform_fee": forms.NumberInput(attrs={"class": "form-control", "min": 0, "step": "0.01"}),
@@ -121,7 +158,23 @@ class ListingWorkflowForm(forms.ModelForm):
         cleaned_data = super().clean()
         if cleaned_data.get("status") == ListingStatus.SOLD and cleaned_data.get("actual_sale_price") is None:
             self.add_error("actual_sale_price", "U prodané položky zadej skutečnou prodejní cenu.")
+        if cleaned_data.get("status") != ListingStatus.LISTED:
+            cleaned_data["is_public"] = False
         return cleaned_data
+
+
+class ListingReportForm(forms.Form):
+    reason = forms.ChoiceField(
+        choices=ListingReportReason.choices,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label="Důvod nahlášení",
+    )
+    details = forms.CharField(
+        required=False,
+        max_length=500,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        label="Doplňující informace",
+    )
 
 
 class UserRegistrationForm(forms.ModelForm):
@@ -147,6 +200,15 @@ class UserRegistrationForm(forms.ModelForm):
         p2 = self.cleaned_data.get("password2")
         if p1 and p2 and p1 != p2:
             raise forms.ValidationError("Hesla se neshodují.")
+        if p2:
+            candidate = User(
+                username=self.cleaned_data.get("username", ""),
+                email=self.cleaned_data.get("email", ""),
+            )
+            try:
+                validate_password(p2, user=candidate)
+            except DjangoValidationError as error:
+                raise forms.ValidationError(error.messages) from error
         return p2
 
     def clean_username(self):

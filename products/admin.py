@@ -1,6 +1,7 @@
 from django.contrib import admin
+from django.db.models import Count
 from django.utils.html import format_html
-from .models import Product, Review, Trend, ProductRequest, ProductMessage
+from .models import Product, Review, Trend, ProductRequest, ProductMessage, ListingReport
 
 
 @admin.register(Product)
@@ -14,6 +15,9 @@ class ProductAdmin(admin.ModelAdmin):
     readonly_fields = ("estimated_price", "demand_score", "created_at", "updated_at")
     ordering = ("-created_at",)
     list_per_page = 25
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_review_count=Count("reviews"))
 
     fieldsets = (
         ("Product Info", {
@@ -47,7 +51,7 @@ class ProductAdmin(admin.ModelAdmin):
     demand_badge.short_description = "Demand"
 
     def review_count(self, obj):
-        return obj.reviews.count()
+        return obj._review_count
     review_count.short_description = "Reviews"
 
 
@@ -119,4 +123,15 @@ class GeneratedListingAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False  # Admins cannot manually create — only users can via generator
+
+
+@admin.register(ListingReport)
+class ListingReportAdmin(admin.ModelAdmin):
+    list_display = ("listing", "reporter", "reason", "status", "created_at", "reviewed_at")
+    list_filter = ("status", "reason", "created_at")
+    search_fields = ("listing__product_name", "reporter__username", "details")
+    readonly_fields = ("listing", "reporter", "reason", "details", "created_at")
+    list_editable = ("status",)
+    ordering = ("status", "created_at")
+    list_per_page = 30
 

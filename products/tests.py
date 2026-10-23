@@ -4,16 +4,20 @@ from io import BytesIO
 from tempfile import TemporaryDirectory
 
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase
-from django.test.utils import override_settings
+from django.db import IntegrityError, connection, transaction
+from django.core.management import call_command, CommandError
+from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from PIL import Image
 
 from products import ai_engine, services
-from products.forms import ListingWorkflowForm
-from products.models import GeneratedListing, ListingStatus, Product
+from products.admin import ProductAdmin
+from products.forms import ListingWorkflowForm, ProductMessageForm, ProductRequestForm, UserRegistrationForm
+from products.models import GeneratedListing, ListingStatus, Product, ProductMessage, ProductRequest, RequestStatus, Review
 from products.views import _seller_listing_summary
 
 
@@ -142,7 +146,110 @@ class SecurityBehaviorTests(TestCase):
         self.assertEqual(response.url, "/dashboard/")
 
 
-class ListingFinanceTests(SimpleTestCase):
+class RegistrationPasswordValidationTests(TestCase):
+    def test_registration_rejects_short_password(self):
+        form = UserRegistrationForm(data={
+            "username": "new-reseller",
+            "email": "reseller@example.com",
+            "password": "short",
+            "password2": "short",
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("password2", form.errors)
+
+
+class RequestChatAuthorizationTests(TestCase):
+    def setUp(self):
+        self.requester = User.objects.create_user(username="requester", password="safe-password-123")
+        self.product = Product.objects.create(
+            name="Camera",
+            description="Used camera",
+            price=100,
+            category="Electronics",
+        )
+        self.product_request = ProductRequest.objects.create(
+            product=self.product,
+            requester=self.requester,
+            message="Is this still available?",
+        )
+        self.url = reverse("request_chat", args=[self.product_request.pk])
+        self.client.force_login(self.requester)
+
+    def test_requester_can_read_and_send_messages(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(self.url, {"message": "I can collect it tomorrow."})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ProductMessage.objects.filter(
+            request=self.product_request,
+            sender=self.requester,
+            text="I can collect it tomorrow.",
+        ).exists())
+
+    def test_requester_cannot_change_request_status(self):
+        self.client.post(self.url, {"status": RequestStatus.CLOSED})
+
+        self.product_request.refresh_from_db()
+        self.assertEqual(self.product_request.status, RequestStatus.NEW)
+
+    def test_product_request_rejects_message_longer_than_limit(self):
+        other_product = Product.objects.create(
+            name="Lens",
+            description="Used lens",
+            price=50,
+            category="Electronics",
+        )
+
+        response = self.client.post(
+            reverse("create_product_request", args=[other_product.pk]),
+            {"message": "x" * 1001},
+        )
+
+        self.assertRedirects(response, reverse("product_detail", args=[other_product.pk]))
+        self.assertFalse(ProductRequest.objects.filter(product=other_product).exists())
+
+    def test_unrelated_user_cannot_read_request_chat(self):
+        other_user = User.objects.create_user(username="other", password="safe-password-123")
+        self.client.force_login(other_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_staff_can_change_request_status(self):
+        staff_user = User.objects.create_user(
+            username="staff",
+            password="safe-password-123",
+            is_staff=True,
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.post(self.url, {"status": RequestStatus.CLOSED})
+
+        self.assertEqual(response.status_code, 200)
+        self.product_request.refresh_from_db()
+        self.assertEqual(self.product_request.status, RequestStatus.CLOSED)
+
+    def test_chat_rejects_messages_longer_than_limit(self):
+        response = self.client.post(self.url, {"message": "x" * 2001})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ProductMessage.objects.filter(request=self.product_request).exists())
+        self.assertIn("message", response.context["message_form"].errors)
+
+    def test_request_forms_enforce_message_limits(self):
+        self.assertFalse(ProductRequestForm(data={"message": "x" * 1001}).is_valid())
+        self.assertFalse(ProductMessageForm(data={"message": "x" * 2001}).is_valid())
+
+    def test_database_rejects_duplicate_request_for_same_product_and_user(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ProductRequest.objects.create(product=self.product, requester=self.requester)
+
+
+class ListingFinanceTests(TestCase):
     def test_net_profit_includes_shipping_and_platform_fees(self):
         listing = GeneratedListing(
             original_price=100,
@@ -211,6 +318,84 @@ class SellerSummaryTests(TestCase):
         self.assertEqual(summary["listing_counts"]["sold"], 1)
         self.assertEqual(summary["projected_profit"], Decimal("0.00"))
         self.assertEqual(summary["realized_profit"], Decimal("59.50"))
+
+
+class ProductDetailReviewAggregationTests(TestCase):
+    def test_review_summary_and_distribution_are_correct(self):
+        product = Product.objects.create(
+            name="Camera",
+            description="Used camera",
+            price=100,
+            category="Electronics",
+        )
+        Review.objects.create(product=product, username="one", rating=5, comment="Great")
+        Review.objects.create(product=product, username="two", rating=5, comment="Great")
+        Review.objects.create(product=product, username="three", rating=2, comment="Okay")
+
+        response = self.client.get(reverse("product_detail", args=[product.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["review_count"], 3)
+        self.assertEqual(response.context["avg_rating"], 4.0)
+        self.assertEqual(response.context["distribution"][5], {"count": 2, "pct": 67})
+        self.assertEqual(response.context["distribution"][2], {"count": 1, "pct": 33})
+        self.assertIsInstance(response.context["product_request_form"], ProductRequestForm)
+
+
+class ProductListQueryTests(TestCase):
+    def test_catalog_uses_one_annotated_review_query_for_multiple_products(self):
+        for index in range(4):
+            Product.objects.create(
+                name=f"Camera {index}",
+                description="Used camera",
+                price=100,
+                category="Electronics",
+            )
+
+        with CaptureQueriesContext(connection) as captured_queries:
+            response = self.client.get(reverse("product_list"))
+
+        self.assertEqual(response.status_code, 200)
+        per_product_review_queries = [
+            query["sql"]
+            for query in captured_queries
+            if 'FROM "products_review" WHERE "products_review"."product_id"' in query["sql"]
+        ]
+        self.assertEqual(per_product_review_queries, [])
+
+
+class SeedCommandSafetyTests(TestCase):
+    @override_settings(DEBUG=False)
+    def test_seed_command_refuses_to_run_when_debug_is_disabled(self):
+        with self.assertRaisesMessage(CommandError, "nelze seedovat při DEBUG=False"):
+            call_command("seed_data")
+
+        self.assertFalse(Product.objects.exists())
+        self.assertFalse(Review.objects.exists())
+
+
+class ProductAdminQueryTests(TestCase):
+    def test_review_count_uses_annotated_value_without_extra_queries(self):
+        first = Product.objects.create(
+            name="First camera", description="Camera", price=100, category="Electronics"
+        )
+        second = Product.objects.create(
+            name="Second camera", description="Camera", price=120, category="Electronics"
+        )
+        Review.objects.create(product=first, username="one", rating=5, comment="Great")
+        Review.objects.create(product=second, username="two", rating=4, comment="Good")
+        Review.objects.create(product=second, username="three", rating=5, comment="Great")
+        request = RequestFactory().get("/admin/products/product/")
+        request.user = User(is_staff=True, is_active=True)
+        product_admin = ProductAdmin(Product, admin.site)
+
+        with self.assertNumQueries(1):
+            products = list(product_admin.get_queryset(request))
+            review_counts = {
+                product.name: product_admin.review_count(product) for product in products
+            }
+
+        self.assertEqual(review_counts, {"First camera": 1, "Second camera": 2})
 
 
 class SellerWorkflowIntegrationTests(TestCase):

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -8,13 +9,35 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.contrib.auth.models import User
+from django.http import Http404, JsonResponse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from .models import Product, Review, Trend, Category, GeneratedListing, ProductRequest, ProductMessage, RequestStatus, ListingStatus
-from .forms import ProductForm, GeneratedListingForm, ListingWorkflowForm, UserRegistrationForm, StyledLoginForm
+from .models import (
+    Product,
+    Review,
+    Trend,
+    Category,
+    GeneratedListing,
+    ProductRequest,
+    ProductMessage,
+    RequestStatus,
+    ListingStatus,
+    FavoriteListing,
+    ListingReport,
+)
+from .forms import (
+    ProductForm,
+    ProductMessageForm,
+    ProductRequestForm,
+    GeneratedListingForm,
+    ListingWorkflowForm,
+    ListingReportForm,
+    UserRegistrationForm,
+    StyledLoginForm,
+)
 from .services import save_ebay_prices_to_product, fetch_ebay_prices
 from .ai_engine import run_ai_generation
 
@@ -118,19 +141,31 @@ def product_list(request):
 def product_detail(request, pk):
     product     = get_object_or_404(Product.objects.prefetch_related("reviews"), pk=pk)
     reviews     = product.reviews.order_by("-created_at")
-    avg_data    = reviews.aggregate(avg=Avg("rating"))
-    avg_rating  = round(avg_data["avg"] or 0, 1)
+    review_counts = {
+        item["rating"]: item["total"]
+        for item in reviews.order_by().values("rating").annotate(total=Count("pk"))
+    }
+    review_count = sum(review_counts.values())
+    avg_rating = (
+        round(sum(rating * count for rating, count in review_counts.items()) / review_count, 1)
+        if review_count
+        else 0
+    )
     avg_stars   = range(round(avg_rating))
     empty_stars = range(5 - round(avg_rating))
     distribution = {}
     for i in range(5, 0, -1):
-        count = reviews.filter(rating=i).count()
-        distribution[i] = {"count": count, "pct": round((count / reviews.count()) * 100) if reviews.count() else 0}
+        count = review_counts.get(i, 0)
+        distribution[i] = {
+            "count": count,
+            "pct": round((count / review_count) * 100) if review_count else 0,
+        }
     related = Product.objects.filter(category=product.category).exclude(pk=pk).order_by("-created_at")[:4]
     return render(request, "products/product_detail.html", {
         "product": product, "reviews": reviews,
         "avg_rating": avg_rating, "avg_stars": avg_stars,
-        "empty_stars": empty_stars, "review_count": reviews.count(),
+        "empty_stars": empty_stars, "review_count": review_count,
+        "product_request_form": ProductRequestForm(),
         "distribution": distribution, "related_products": related,
     })
 
@@ -155,6 +190,147 @@ def trending(request):
     })
 
 
+def marketplace_listings(request):
+    listings = GeneratedListing.objects.filter(
+        is_public=True,
+        status=ListingStatus.LISTED,
+    ).select_related("owner")
+    search_query = request.GET.get("search", "").strip()
+    selected_category = request.GET.get("category", "").strip()
+    if search_query:
+        listings = listings.filter(
+            Q(product_name__icontains=search_query)
+            | Q(item_description__icontains=search_query)
+        )
+    if selected_category in Category.values:
+        listings = listings.filter(product_category=selected_category)
+    else:
+        selected_category = ""
+
+    page_obj = Paginator(listings.order_by("-listed_at", "-created_at"), 12).get_page(
+        request.GET.get("page")
+    )
+    return render(request, "marketplace/listings.html", {
+        "listings": page_obj.object_list,
+        "page_obj": page_obj,
+        "search_query": search_query,
+        "selected_category": selected_category,
+        "categories": Category.choices,
+    })
+
+
+def public_listing_detail(request, pk):
+    listing = get_object_or_404(
+        GeneratedListing.objects.select_related("owner"),
+        pk=pk,
+        is_public=True,
+        status=ListingStatus.LISTED,
+    )
+    is_favorite = (
+        FavoriteListing.objects.filter(user=request.user, listing=listing).exists()
+        if request.user.is_authenticated
+        else False
+    )
+    return render(request, "marketplace/listing_detail.html", {
+        "listing": listing,
+        "is_favorite": is_favorite,
+        "report_form": ListingReportForm(),
+    })
+
+
+def seller_profile(request, user_id):
+    seller = get_object_or_404(User, pk=user_id, is_active=True)
+    listings = GeneratedListing.objects.filter(
+        owner=seller,
+        is_public=True,
+        status=ListingStatus.LISTED,
+    ).order_by("-listed_at", "-created_at")
+    return render(request, "marketplace/seller_profile.html", {
+        "seller": seller,
+        "listings": listings,
+    })
+
+
+@login_required(login_url="/login/")
+@require_POST
+def toggle_favorite_listing(request, pk):
+    listing = get_object_or_404(
+        GeneratedListing,
+        pk=pk,
+        is_public=True,
+        status=ListingStatus.LISTED,
+    )
+    if listing.owner_id == request.user.pk:
+        messages.error(request, "Vlastní nabídku nelze přidat mezi oblíbené.")
+        return redirect("public_listing_detail", pk=listing.pk)
+
+    favorite, created = FavoriteListing.objects.get_or_create(
+        user=request.user,
+        listing=listing,
+    )
+    if created:
+        messages.success(request, "Nabídka byla přidána do oblíbených.")
+    else:
+        favorite.delete()
+        messages.info(request, "Nabídka byla odebrána z oblíbených.")
+    return redirect("public_listing_detail", pk=listing.pk)
+
+
+@login_required(login_url="/login/")
+@require_POST
+def report_public_listing(request, pk):
+    listing = get_object_or_404(
+        GeneratedListing,
+        pk=pk,
+        is_public=True,
+        status=ListingStatus.LISTED,
+    )
+    if listing.owner_id == request.user.pk:
+        messages.error(request, "Vlastní nabídku nelze nahlásit.")
+        return redirect("public_listing_detail", pk=listing.pk)
+
+    recent_reports = ListingReport.objects.filter(
+        reporter=request.user,
+        created_at__gte=timezone.now() - timedelta(hours=1),
+    ).count()
+    if recent_reports >= 5:
+        messages.error(request, "Dosáhl/a jsi hodinového limitu nahlášení.")
+        return redirect("public_listing_detail", pk=listing.pk)
+
+    form = ListingReportForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Zkontroluj důvod a délku doplňujících informací.")
+        return redirect("public_listing_detail", pk=listing.pk)
+
+    _, created = ListingReport.objects.get_or_create(
+        reporter=request.user,
+        listing=listing,
+        defaults={
+            "reason": form.cleaned_data["reason"],
+            "details": form.cleaned_data["details"],
+        },
+    )
+    if created:
+        messages.success(request, "Nahlášení bylo předáno ke kontrole.")
+    else:
+        messages.info(request, "Tuto nabídku jsi už nahlásil/a.")
+    return redirect("public_listing_detail", pk=listing.pk)
+
+
+@login_required(login_url="/login/")
+def favorite_listings(request):
+    favorites = FavoriteListing.objects.filter(
+        user=request.user,
+        listing__is_public=True,
+        listing__status=ListingStatus.LISTED,
+    ).select_related("listing", "listing__owner")
+    page_obj = Paginator(favorites, 12).get_page(request.GET.get("page"))
+    return render(request, "marketplace/favorites.html", {
+        "favorites": page_obj.object_list,
+        "page_obj": page_obj,
+    })
+
+
 # ── Admin only ────────────────────────────────────────────────────────────────
 
 @require_POST
@@ -165,7 +341,12 @@ def create_product_request(request, pk):
         messages.warning(request, "Správci nemohou posílat žádosti o vlastní produkty.")
         return redirect("product_detail", pk=pk)
 
-    message = (request.POST.get("message") or f"I’m interested in {product.name}.").strip()
+    form = ProductRequestForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Zpráva je příliš dlouhá.")
+        return redirect("product_detail", pk=pk)
+
+    message = form.cleaned_data["message"] or f"I’m interested in {product.name}."
     request_obj, created = ProductRequest.objects.get_or_create(
         product=product,
         requester=request.user,
@@ -192,22 +373,33 @@ def admin_requests(request):
     return render(request, "products/admin_requests.html", {"requests": requests})
 
 
-@staff_member_required(login_url="/login/")
+@login_required(login_url="/login/")
 def request_chat(request, pk):
     request_obj = get_object_or_404(ProductRequest, pk=pk)
     if not (request.user.is_staff or request.user == request_obj.requester):
-        messages.error(request, "K této žádosti nemáš přístup.")
-        return redirect("home")
+        raise Http404
 
+    message_form = ProductMessageForm()
     if request.method == "POST":
         if "status" in request.POST:
-            request_obj.status = request.POST.get("status", request_obj.status)
-            request_obj.save(update_fields=["status", "updated_at"])
-            messages.success(request, "Stav žádosti byl uložen.")
+            if not request.user.is_staff:
+                messages.error(request, "Stav žádosti může změnit pouze správce.")
+            else:
+                status = request.POST.get("status", "")
+                if status in RequestStatus.values:
+                    request_obj.status = status
+                    request_obj.save(update_fields=["status", "updated_at"])
+                    messages.success(request, "Stav žádosti byl uložen.")
+                else:
+                    messages.error(request, "Zvolený stav žádosti není platný.")
         else:
-            text = (request.POST.get("message") or "").strip()
-            if text:
-                ProductMessage.objects.create(request=request_obj, sender=request.user, text=text)
+            message_form = ProductMessageForm(request.POST)
+            if message_form.is_valid():
+                ProductMessage.objects.create(
+                    request=request_obj,
+                    sender=request.user,
+                    text=message_form.cleaned_data["message"],
+                )
                 if request.user.is_staff:
                     request_obj.status = "contacted"
                 request_obj.save(update_fields=["status", "updated_at"])
@@ -216,6 +408,7 @@ def request_chat(request, pk):
     return render(request, "products/request_chat.html", {
         "request_obj": request_obj,
         "messages": request_obj.messages.all(),
+        "message_form": message_form,
         "status_choices": RequestStatus.choices,
     })
 

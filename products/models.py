@@ -59,6 +59,21 @@ class RequestStatus(models.TextChoices):
     CLOSED     = "closed",   "Closed"
 
 
+class ListingReportReason(models.TextChoices):
+    MISLEADING = "misleading", "Zavádějící popis"
+    PROHIBITED = "prohibited", "Zakázané nebo rizikové zboží"
+    COUNTERFEIT = "counterfeit", "Podezření na padělek"
+    SPAM = "spam", "Spam nebo duplicitní nabídka"
+    OTHER = "other", "Jiný důvod"
+
+
+class ListingReportStatus(models.TextChoices):
+    OPEN = "open", "Nové"
+    REVIEWING = "reviewing", "Prověřuje se"
+    ACTIONED = "actioned", "Bylo řešeno"
+    DISMISSED = "dismissed", "Bez porušení"
+
+
 # ─── Public product (admin only) ─────────────────────────────────────────────
 
 class Product(models.Model):
@@ -178,6 +193,12 @@ class ProductRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "requester"],
+                name="unique_product_request_per_requester",
+            )
+        ]
 
     @property
     def is_open(self):
@@ -243,6 +264,7 @@ class GeneratedListing(models.Model):
     platform_fee_fixed     = models.PositiveIntegerField(default=0)
     selling_platform       = models.CharField(max_length=10, choices=SellingPlatform.choices, default=SellingPlatform.OTHER)
     status                 = models.CharField(max_length=10, choices=ListingStatus.choices, default=ListingStatus.READY)
+    is_public              = models.BooleanField(default=False)
     actual_sale_price      = models.PositiveIntegerField(blank=True, null=True)
     actual_shipping_cost   = models.PositiveIntegerField(blank=True, null=True)
     actual_platform_fee    = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -271,6 +293,12 @@ class GeneratedListing(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Generated Listing"
         verbose_name_plural = "Generated Listings"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(is_public=False) | models.Q(status=ListingStatus.LISTED),
+                name="public_listing_requires_listed_status",
+            )
+        ]
 
     @property
     def demand_color(self):
@@ -367,3 +395,59 @@ class GeneratedListing(models.Model):
 
     def __str__(self):
         return f"{self.owner.username} — {self.product_name}"
+
+
+class FavoriteListing(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="favorite_listings")
+    listing = models.ForeignKey(
+        GeneratedListing,
+        on_delete=models.CASCADE,
+        related_name="favorites",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "listing"],
+                name="unique_favorite_listing_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} ♥ {self.listing.product_name}"
+
+
+class ListingReport(models.Model):
+    listing = models.ForeignKey(
+        GeneratedListing,
+        on_delete=models.CASCADE,
+        related_name="reports",
+    )
+    reporter = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="listing_reports",
+    )
+    reason = models.CharField(max_length=20, choices=ListingReportReason.choices)
+    details = models.CharField(max_length=500, blank=True)
+    status = models.CharField(
+        max_length=12,
+        choices=ListingReportStatus.choices,
+        default=ListingReportStatus.OPEN,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reporter", "listing"],
+                name="unique_listing_report_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"Report {self.pk}: {self.listing.product_name} ({self.status})"

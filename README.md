@@ -36,7 +36,7 @@ flowchart LR
     Šablony --> Prohlížeč
 ```
 
-Podrobnější popis je v [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Podrobnější popis včetně vztahů databázových modelů je v [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md).
 
 ## Struktura repozitáře
 
@@ -102,6 +102,8 @@ Příkazy jsou pro Windows PowerShell a spouštějí se v kořenové složce pro
 
 Pro lokální spuštění není soubor `.env` povinný. Výchozí konfigurace používá SQLite a lokální úložiště `media/`. Pro eBay data vytvoř lokální konfiguraci příkazem `Copy-Item .env.example .env` a doplň `EBAY_CLIENT_ID` a `EBAY_CLIENT_SECRET`; bez těchto údajů funguje cenový odhad z lokálních pravidel. `.env` neukládej do verzování. Výchozí tajný klíč je určen pouze pro místní vývoj, ne pro nasazení.
 
+Za reverzní proxy nastav `TRUST_PROXY_SSL_HEADER=True` pouze tehdy, pokud proxy přepisuje příchozí `X-Forwarded-Proto` na důvěryhodnou hodnotu. Jinak ponech výchozí `False`.
+
 V GitHubu nastav citlivé hodnoty jako **repository secrets** v `Settings → Secrets and variables → Actions` (názvy `EBAY_CLIENT_ID` a `EBAY_CLIENT_SECRET`). Nevkládej jejich hodnoty do README, zdrojových souborů ani `.env.example`. Repozitář neobsahuje nasazovací workflow; samotné uložení secrets proto aplikaci automaticky nenakonfiguruje.
 
 ## Ukázka použití
@@ -118,7 +120,15 @@ V GitHubu nastav citlivé hodnoty jako **repository secrets** v `Settings → Se
 - Doplnit další zdroje tržních dat a porovnávání podle přesnějších parametrů zboží.
 - Přidat export inventáře a přehledů do CSV.
 - Rozšířit testy o další scénáře práce s formuláři a externím API.
-- Doplnit skutečné screenshoty obrazovek a nasazovací návod pro konkrétní hosting.
+- Připravit nasazovací návod pro konkrétní hosting.
+
+## Screenshoty
+
+Zatím nejsou přiloženy. Před odevzdáním doplň vlastní snímky a odstraň z nich osobní údaje.
+
+- Domovská stránka: `[doplnit screenshot]`
+- Katalog a detail produktu: `[doplnit screenshot]`
+- Přehled prodejce a generátor nabídky: `[doplnit screenshot]`
 
 ## Autor a škola
 
